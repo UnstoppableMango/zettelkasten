@@ -327,6 +327,10 @@
     },
     "root": {
       "inputs": {
+        "a2b": [
+          "apis",
+          "a2b"
+        ],
         "apis": "apis",
         "flake-parts": "flake-parts",
         "nixpkgs": "nixpkgs",

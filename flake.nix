@@ -22,6 +22,10 @@
       inputs.flake-parts.follows = "flake-parts";
       inputs.treefmt-nix.follows = "treefmt-nix";
     };
+
+    # apis already depends on a2b for the same buf library. Following its node
+    # keeps one a2b, and its pulumi closure, in the lock rather than two.
+    a2b.follows = "apis/a2b";
   };
 
   outputs =
@@ -45,10 +49,22 @@
           # needs an output of its own to be reachable from `nix build`.
           packages.slip-standalone = self'.packages.slip.override { withZk = false; };
 
-          packages.generate = pkgs.callPackage ./nix/generate.nix {
+          packages.generated = pkgs.callPackage ./nix/generated.nix {
             apisWorkspace = inputs'.apis.legacyPackages.unmangoApis.workspace;
+            bufLib = inputs'.a2b.legacyPackages.lib.buf;
+          };
+
+          packages.generate = pkgs.callPackage ./nix/generate.nix {
+            inherit (self'.packages) generated;
           };
           apps.generate.program = self'.packages.generate;
+
+          # gen/ is checked in, so it can fall behind the pinned apis input.
+          # This is the only thing that notices.
+          checks.generate = pkgs.runCommand "check-generate" { } ''
+            diff -r ${self'.packages.generated}/gen ${./gen}
+            touch "$out"
+          '';
 
           # buildGoModule already runs `go test ./...`; this adds vet and the
           # race detector on top of it.
