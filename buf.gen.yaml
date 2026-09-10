@@ -1,0 +1,21 @@
+version: v2
+
+# Mirrors unmango/apis' own template, but rewrites go_package into this repo so
+# the generated tree is a normal in-module package rather than something that
+# needs a replace directive.
+#
+# default_api_level is deliberately unset: the zettelkasten protos are edition
+# 2024, for which protoc-gen-go already defaults to the opaque API. Forcing it
+# here would also flip the proto3 google/api and k8s.io files, diverging from
+# what apis generates.
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/UnstoppableMango/zettelkasten/gen
+
+plugins:
+  - local: protoc-gen-go
+    out: gen
+    opt:
+      - paths=source_relative
