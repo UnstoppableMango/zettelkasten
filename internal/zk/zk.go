@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -92,6 +93,15 @@ func List(ctx context.Context, dir string) ([]Note, error) {
 
 	out, err := cmd.Output()
 	if err != nil {
+		// Output captures stderr into ExitError.Stderr, but its message drops
+		// it, which loses the only useful part of a config parse failure.
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && len(exit.Stderr) > 0 {
+			return nil, fmt.Errorf("running %s list in %s: %w: %s",
+				Binary, dir, err, bytes.TrimSpace(exit.Stderr),
+			)
+		}
+
 		return nil, fmt.Errorf("running %s list in %s: %w", Binary, dir, err)
 	}
 

@@ -3,6 +3,7 @@ package zk_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -131,5 +132,32 @@ func TestParseListEmpty(t *testing.T) {
 func TestParseListMalformed(t *testing.T) {
 	if _, err := zk.ParseList(strings.NewReader("{\"filename\":\n")); err == nil {
 		t.Error("ParseList() = nil error, want an error")
+	}
+}
+
+// zk reports config parse failures on stderr. Without it the wrapped error is
+// just an exit status, which says nothing about what went wrong.
+func TestListSurfacesStderr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stub is a shell script")
+	}
+
+	bin := t.TempDir()
+	stub := filepath.Join(bin, zk.Binary)
+	script := "#!/bin/sh\necho 'toml: line 3: expected key separator' >&2\nexit 1\n"
+
+	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
+		t.Fatalf("writing stub: %v", err)
+	}
+
+	t.Setenv("PATH", bin)
+
+	_, err := zk.List(t.Context(), t.TempDir())
+	if err == nil {
+		t.Fatal("List() = nil error, want an error")
+	}
+
+	if !strings.Contains(err.Error(), "expected key separator") {
+		t.Errorf("error %q does not carry zk's stderr", err)
 	}
 }
