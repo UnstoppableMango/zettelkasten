@@ -41,6 +41,10 @@
           packages.default = self'.packages.slip;
           packages.slip = pkgs.callPackage ./nix/package.nix { };
 
+          # An attribute path cannot apply `.override`, so the zk-free build
+          # needs an output of its own to be reachable from `nix build`.
+          packages.slip-standalone = self'.packages.slip.override { withZk = false; };
+
           packages.generate = pkgs.callPackage ./nix/generate.nix {
             apisWorkspace = inputs'.apis.legacyPackages.unmangoApis.workspace;
           };

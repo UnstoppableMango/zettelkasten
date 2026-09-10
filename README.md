@@ -14,7 +14,11 @@ nix run github:UnstoppableMango/zettelkasten
 ```
 
 The packaged binary carries `zk` on its `PATH`.
-For a build without it, `nix build '.#slip.override { withZk = false; }'`.
+For a build with no `zk` in its closure:
+
+```sh
+nix build .#slip-standalone
+```
 
 ## Capture
 
@@ -48,6 +52,7 @@ The first of these that is set wins:
 
 1. `--dir`
 1. `$ZK_DIR`
+1. `$ZK_NOTEBOOK_DIR`, the same override zk itself honours
 1. the zk notebook found by walking up from the working directory
 1. `$XDG_DATA_HOME/zettelkasten`, else `~/.local/share/zettelkasten`
 

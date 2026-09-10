@@ -31,6 +31,19 @@ func TestResolvePrecedence(t *testing.T) {
 			cwd:     "/cwd",
 			want:    "/env",
 		},
+		"env wins over notebook env": {
+			env:     map[string]string{config.EnvDir: "/env", notebook.EnvDir: "/notebook-env"},
+			markers: []string{"/cwd/.zk"},
+			cwd:     "/cwd",
+			want:    "/env",
+		},
+		"notebook env wins over walk-up": {
+			env:      map[string]string{notebook.EnvDir: "/notebook-env", "XDG_DATA_HOME": "/xdg"},
+			markers:  []string{"/cwd/.zk"},
+			cwd:      "/cwd",
+			want:     "/notebook-env",
+			notebook: true,
+		},
 		"notebook wins over xdg": {
 			env:      map[string]string{"XDG_DATA_HOME": "/xdg"},
 			markers:  []string{"/cwd/.zk"},
