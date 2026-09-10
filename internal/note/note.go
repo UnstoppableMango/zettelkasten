@@ -47,16 +47,18 @@ func (n Note) Name() string {
 	return "notes/" + n.ZettelID
 }
 
-// TitleFrom derives a title from the first non-empty line of body, dropping a
-// leading ATX heading marker. An all-whitespace body has no title.
+// TitleFrom derives a title from the first line of body that says something,
+// dropping a leading ATX heading marker. A line of bare heading markers says
+// nothing, so it is skipped rather than taken as an empty title. A body with
+// nothing but whitespace and markers has no title.
 func TitleFrom(body string) string {
 	for line := range strings.Lines(body) {
-		line = strings.TrimSpace(line)
-		if line == "" {
+		title := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "#"))
+		if title == "" {
 			continue
 		}
 
-		return strings.TrimSpace(strings.TrimLeft(line, "#"))
+		return title
 	}
 
 	return ""

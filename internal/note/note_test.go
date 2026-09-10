@@ -84,3 +84,26 @@ func TestNewTruncatesToSecond(t *testing.T) {
 		t.Errorf("CreateTime = %v, want %v", got, want)
 	}
 }
+
+// A line that is only heading markers carries no title, but the thought below
+// it still does. Stopping at the marker would drop a title the note has.
+func TestTitleFromSkipsEmptyHeadings(t *testing.T) {
+	tests := map[string]struct {
+		body string
+		want string
+	}{
+		"bare hashes then content":    {"###\nreal content\n", "real content"},
+		"hashes, blank, content":      {"###\n\nreal content\n", "real content"},
+		"hash and spaces":             {"#   \nreal content\n", "real content"},
+		"several empty headings":      {"#\n##\n###\nreal content\n", "real content"},
+		"still empty when no content": {"###\n\n   \n", ""},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := note.TitleFrom(tt.body); got != tt.want {
+				t.Errorf("TitleFrom(%q) = %q, want %q", tt.body, got, tt.want)
+			}
+		})
+	}
+}
