@@ -62,7 +62,7 @@
           # gen/ is checked in, so it can fall behind the pinned apis input.
           # This is the only thing that notices.
           checks.generate = pkgs.runCommand "check-generate" { } ''
-            diff -r ${self'.packages.generated}/gen ${./gen}
+            diff -ruN ${self'.packages.generated}/gen ${./gen}
             touch "$out"
           '';
 
