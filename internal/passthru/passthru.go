@@ -7,6 +7,7 @@ package passthru
 import (
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 
 	"github.com/UnstoppableMango/zettelkasten/internal/cli"
@@ -29,18 +30,40 @@ func Owns(args []string) bool {
 
 	first := args[0]
 
-	// A leading flag is slip's own: `slip --version`, `slip --dir x`.
-	if strings.HasPrefix(first, "-") {
+	// A bare "-" is the read-stdin convention, and "--" ends slip's own options.
+	if first == "-" || first == "--" {
 		return true
 	}
 
-	for _, name := range builtins {
-		if first == name {
-			return true
+	if strings.HasPrefix(first, "-") {
+		return ownsFlag(first)
+	}
+
+	return slices.Contains(builtins, first) || cli.Owned(first)
+}
+
+// ownsFlag reports whether arg names an option slip registers. zk has global
+// options of its own, such as --notebook-dir, and treating every leading dash
+// as slip's would reject them here instead of letting zk act on them.
+func ownsFlag(arg string) bool {
+	flags := cli.Flags()
+
+	if long, ok := strings.CutPrefix(arg, "--"); ok {
+		name, _, _ := strings.Cut(long, "=")
+		return flags.Lookup(name) != nil
+	}
+
+	short, _, _ := strings.Cut(strings.TrimPrefix(arg, "-"), "=")
+
+	// Shorthands combine, as in -abc, and the whole cluster has to be slip's
+	// for the invocation to be.
+	for _, r := range short {
+		if flags.ShorthandLookup(string(r)) == nil {
+			return false
 		}
 	}
 
-	return cli.Owned(first)
+	return short != ""
 }
 
 // Exec replaces this process with zk. Replacing rather than wrapping means

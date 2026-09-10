@@ -2,7 +2,10 @@
 package cli
 
 import (
+	"slices"
+
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // Version is set at build time.
@@ -34,18 +37,25 @@ func New() *cobra.Command {
 	return root
 }
 
+// Flags returns the options the root command accepts, including the help and
+// version flags cobra would otherwise only add once it starts executing.
+//
+// Anything absent from this set belongs to zk, so an option slip does not
+// register must reach zk rather than being rejected here.
+func Flags() *pflag.FlagSet {
+	root := New()
+	root.InitDefaultHelpFlag()
+	root.InitDefaultVersionFlag()
+
+	return root.Flags()
+}
+
 // Owned reports whether name is a command slip implements, which is what
 // decides between handling an invocation and passing it to zk.
 func Owned(name string) bool {
 	for _, cmd := range New().Commands() {
-		if cmd.Name() == name {
+		if cmd.Name() == name || slices.Contains(cmd.Aliases, name) {
 			return true
-		}
-
-		for _, alias := range cmd.Aliases {
-			if alias == name {
-				return true
-			}
 		}
 	}
 
