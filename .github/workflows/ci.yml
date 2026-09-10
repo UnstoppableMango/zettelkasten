@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Every job only reads the repository; nothing here pushes or comments.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing downstream runs an authenticated git command, and these
+          # steps evaluate code from the pull request.
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: unstoppablemango
+
+      - run: nix flake check
+      - run: nix build .#
+
+  # gen/ is committed but generated from the pinned apis input. Without this,
+  # bumping that input leaves the checked-in code silently behind it.
+  generate-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing downstream runs an authenticated git command, and these
+          # steps evaluate code from the pull request.
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: unstoppablemango
+
+      - run: nix run .#generate
+
+      # `git diff` alone would ignore an added binding, since generate rewrites
+      # the whole directory and a new file lands untracked.
+      - name: Check gen/ is up to date
+        run: |
+          if [ -n "$(git status --porcelain -- gen)" ]; then
+            echo "gen/ is out of date; run 'make generate' and commit the result" >&2
+            git status --porcelain -- gen >&2
+            git diff -- gen >&2
+            exit 1
+          fi
