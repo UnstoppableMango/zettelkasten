@@ -92,7 +92,20 @@ func InspectConfig(fsys afero.Fs, root string) (ConfigState, error) {
 }
 
 // WriteConfig appends the stanza to root's config file, creating it if needed.
+//
+// Writing an already-configured notebook does nothing. Appending a second copy
+// would declare the table twice, which is invalid TOML, so this is checked here
+// rather than relying on every caller to check first.
 func WriteConfig(fsys afero.Fs, root string) error {
+	state, err := InspectConfig(fsys, root)
+	if err != nil {
+		return err
+	}
+
+	if state == ConfigPresent {
+		return nil
+	}
+
 	path := filepath.Join(root, ConfigPath)
 
 	if err := fsys.MkdirAll(filepath.Dir(path), 0o755); err != nil {

@@ -91,7 +91,8 @@ func TestWriteConfigAppends(t *testing.T) {
 		t.Errorf("stanza was not appended:\n%s", got)
 	}
 
-	// Writing twice must not accumulate duplicate tables.
+	// Appending must declare the table once. Repeated invocation is covered by
+	// TestWriteConfigIsIdempotent.
 	if strings.Count(got, "[format.markdown.frontmatter]") != 1 {
 		t.Errorf("table appears more than once:\n%s", got)
 	}
@@ -167,5 +168,38 @@ func TestInspectConfigTrailingComment(t *testing.T) {
 
 	if got != notebook.ConfigPresent {
 		t.Errorf("InspectConfig() = %v, want ConfigPresent", got)
+	}
+}
+
+// Appending unconditionally would declare the table twice, which is invalid
+// TOML. Writing an already-configured notebook must change nothing.
+func TestWriteConfigIsIdempotent(t *testing.T) {
+	fsys := afero.NewMemMapFs()
+	path := filepath.Join("/notes", notebook.ConfigPath)
+
+	if err := notebook.WriteConfig(fsys, "/notes"); err != nil {
+		t.Fatalf("first WriteConfig() error = %v", err)
+	}
+
+	first, err := afero.ReadFile(fsys, path)
+	if err != nil {
+		t.Fatalf("reading back: %v", err)
+	}
+
+	if err := notebook.WriteConfig(fsys, "/notes"); err != nil {
+		t.Fatalf("second WriteConfig() error = %v", err)
+	}
+
+	second, err := afero.ReadFile(fsys, path)
+	if err != nil {
+		t.Fatalf("reading back: %v", err)
+	}
+
+	if string(first) != string(second) {
+		t.Errorf("second write changed the file:\n--- first ---\n%s\n--- second ---\n%s", first, second)
+	}
+
+	if n := strings.Count(string(second), "[format.markdown.frontmatter]"); n != 1 {
+		t.Errorf("table appears %d times after two writes, want 1:\n%s", n, second)
 	}
 }
