@@ -31,7 +31,11 @@ The binary is `slip`; the module is `github.com/UnstoppableMango/zettelkasten`.
 
 ## Things that will otherwise be gotten wrong
 
-**`gen/` is generated.** `make generate` runs `buf generate` against the buf workspace from the pinned `apis` flake input, which is what makes the `k8s.io/apimachinery` imports resolve without network or BSR. `gen/SOURCE` records the store path it came from. Never edit it; regenerate.
+**`gen/` is generated.** `packages.generated` builds the tree with `a2b`'s buf library against the buf workspace from the pinned `apis` flake input, which is what makes the `k8s.io/apimachinery` imports resolve without network or BSR. `make generate` copies that derivation into `gen/`, and `checks.generate` diffs the two, so `nix flake check` fails when the checked-in tree falls behind the pinned input. `gen/SOURCE` records the store path it came from. Never edit it; regenerate.
+
+**`buf.gen.yaml` is the only template.** Both the dev shell's `buf generate` and `nix/generated.nix` read the in-tree file, so the config has one home. `protoc-gen-go` reaches the derivation through `nativeBuildInputs`, because `local: protoc-gen-go` resolves off `PATH`.
+
+**The `a2b` input follows `apis/a2b`.** `apis` already depends on the same buf library, so following its node keeps one `a2b`, and its pulumi closure, in `flake.lock` rather than two.
 
 **The generated protos use the protobuf opaque API.** There are no exported struct fields. `&notev1.Note{Title: ...}` will not compile. Build with `notev1.Note_builder{...}.Build()` and read with getters. Every builder field is a pointer, because these are edition 2024 files with explicit presence, so scalars are set with `proto.String(...)` and enums with `.Enum()`.
 
