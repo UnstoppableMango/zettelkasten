@@ -99,12 +99,21 @@ class PublishTest {
     fun twoNotebooksCapturingAtOnceBothSurvive() {
         val other = scratch().apply { mkdirs() }
         val theirs = clientIn(other)
-
-        theirs.capture("from the other notebook\n")
-        theirs.sync()
-
         val mine = Notebook.client(context)
-        mine.capture("from this notebook\n")
+
+        // Both captures happen before either sync. A zettel id is a
+        // minute-precision timestamp, so capturing on one side of a sync and
+        // then the other lets a minute roll over in between, and the test
+        // would pass having exercised no collision at all.
+        val theirPath = theirs.capture("from the other notebook\n")
+        val myPath = mine.capture("from this notebook\n")
+
+        assumeTrue(
+            "the captures landed in different minutes, so there is no collision to resolve",
+            File(theirPath).name == File(myPath).name,
+        )
+
+        theirs.sync()
         mine.sync()
 
         val third = File(context.cacheDir, "third").apply { deleteRecursively(); mkdirs() }

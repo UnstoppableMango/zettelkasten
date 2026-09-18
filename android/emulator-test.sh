@@ -30,6 +30,10 @@ console_port=5570
 serial="emulator-${console_port}"
 daemon_port=9418
 
+# A cold emulator on a slow machine takes a couple of minutes. Past this it is
+# not slow, it is stuck.
+boot_timeout=420
+
 adb="${sdk}/platform-tools/adb"
 emulator="${sdk}/emulator/emulator"
 avdmanager="$(echo "${sdk}"/cmdline-tools/*/bin/avdmanager)"
@@ -42,10 +46,29 @@ export ANDROID_SDK_ROOT="${sdk}"
 work="$(mktemp -d)"
 emulator_pid=""
 
+# stop waits for a process, then insists. Nothing here may block the run: a
+# wedged emulator that ignores `emu kill` would otherwise hold the script open
+# for as long as it felt like, which is the failure this script exists to
+# report rather than to reproduce.
+stop() {
+  local pid=$1 signal
+
+  for signal in "" TERM KILL; do
+    if [ -n "${signal}" ]; then
+      kill -"${signal}" "${pid}" 2>/dev/null || true
+    fi
+
+    for _ in $(seq 1 15); do
+      kill -0 "${pid}" 2>/dev/null || return 0
+      sleep 1
+    done
+  done
+}
+
 cleanup() {
   if [ -n "${emulator_pid}" ]; then
     "${adb}" -s "${serial}" emu kill >/dev/null 2>&1 || true
-    wait "${emulator_pid}" 2>/dev/null || true
+    stop "${emulator_pid}"
   fi
 
   if [ -f "${work}/daemon.pid" ]; then
@@ -88,10 +111,19 @@ echo "booting ${avd}"
 emulator_pid=$!
 
 # Deliberately not `adb wait-for-device`: that blocks forever when the emulator
-# dies on startup, which is most of the ways this goes wrong.
+# dies on startup, which is most of the ways this goes wrong. The deadline
+# covers the rest of them, where the process lives on without ever booting.
+boot_deadline=$(($(date +%s) + boot_timeout))
+
 until [ "$("${adb}" -s "${serial}" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do
   if ! kill -0 "${emulator_pid}" 2>/dev/null; then
     echo "the emulator exited before finishing boot:" >&2
+    tail -40 "${work}/emulator.log" >&2
+    exit 1
+  fi
+
+  if [ "$(date +%s)" -ge "${boot_deadline}" ]; then
+    echo "the emulator did not boot within ${boot_timeout}s:" >&2
     tail -40 "${work}/emulator.log" >&2
     exit 1
   fi
