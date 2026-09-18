@@ -42,8 +42,36 @@
           self',
           inputs',
           pkgs,
+          system,
           ...
         }:
+        let
+          # The Android SDK and NDK are unfree, and the SDK carries a licence
+          # that has to be accepted before it will evaluate at all. Confining
+          # both to a nixpkgs of their own keeps every other output, and
+          # anything a consumer builds from this flake, on the default config.
+          androidNixpkgs = import inputs.nixpkgs {
+            inherit system;
+            config = {
+              allowUnfree = true;
+              android_sdk.accept_license = true;
+            };
+          };
+
+          # gomobile compiles against the SDK platform matching its -androidapi
+          # and refuses to run when that platform is absent, so the oldest
+          # Android the app supports is pinned here rather than left to
+          # whichever platform the SDK happens to ship. The NDK accepts 21
+          # through 35; 24 is the floor that still reaches ordinary phones.
+          androidApi = "24";
+
+          androidBuild = androidNixpkgs.androidenv.composeAndroidPackages {
+            includeNDK = true;
+            platformVersions = [ androidApi ];
+          };
+
+          gomobile = androidNixpkgs.gomobile.override { androidPkgs = androidBuild; };
+        in
         {
           packages.default = self'.packages.slip;
           packages.slip = pkgs.callPackage ./nix/package.nix { };
@@ -91,6 +119,28 @@
               nix-update
               nixfmt
             ];
+          };
+
+          # Separate, because the Android SDK and NDK are several gigabytes of
+          # unfree closure and none of it is needed to change a line of Go.
+          devShells.android = pkgs.mkShellNoCC {
+            inputsFrom = [ self'.devShells.default ];
+
+            packages = [
+              # gomobile builds mobile/ into an .aar. Its wrapper puts the SDK
+              # on PATH and sets ANDROID_HOME; the JDK is what assembles the
+              # archive once the NDK has compiled the Go side.
+              gomobile
+              pkgs.jdk
+            ];
+
+            # gomobile's wrapper appends its own store path to GOPATH, so an
+            # unset GOPATH leaves the read-only store as the only entry and the
+            # module cache has nowhere to go. Setting Go's own default here
+            # puts a writable directory in front of it.
+            shellHook = ''
+              export GOPATH="''${GOPATH:-$HOME/go}"
+            '';
           };
 
           treefmt.programs = {

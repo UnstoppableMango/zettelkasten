@@ -28,6 +28,7 @@ The binary is `slip`; the module is `github.com/UnstoppableMango/zettelkasten`.
 | `make test` | `go test ./...` |
 | `make check` | `nix flake check` (treefmt, vet, race, tests) |
 | `make fmt` | `nix fmt` |
+| `make bind` | `gomobile bind`, producing `mobile/slip.aar` for Android |
 | `make generate` | Regenerate `gen/` from the pinned apis input |
 | `make gomod` | Refresh `vendorHash` after a dependency change |
 
@@ -57,6 +58,22 @@ go-git implements neither, and a zettelkasten does not need them: nothing is eve
 Two devices capturing in the same minute produce different notes at the same address.
 `gitsync.publishedAlready` compares blob hashes for that reason, and `commit` re-resolves the id through `note.NextID` against the remote, rewriting the frontmatter alongside the filename.
 Weakening either one silently drops somebody's thought.
+
+**The Android work needs `nix develop .#android`, not the default shell.**
+The SDK and NDK are several gigabytes of unfree closure, and none of it is needed to change a line of Go.
+
+**`mobile/bind.go` is why `go mod tidy` keeps `golang.org/x/mobile`.**
+gomobile resolves its bind runtime through the module graph, so the module has to require it even though nothing here imports it.
+Build constraints do not hide an import from tidy, which is what makes a file nothing compiles work as the anchor.
+Delete it and the next `make bind` fails with "no required module provides package".
+
+**`-androidapi` has to match the SDK platform the dev shell pins.**
+gomobile compiles against `platforms/android-<androidapi>` and refuses to run when it is absent, and it will not infer the level from what is installed.
+The flake pins 24 and the Makefile passes 24; changing one without the other breaks the bind.
+The NDK accepts 21 through 35, so the default of 16 fails outright.
+
+**The Android SDK is unfree and its licence has to be accepted at evaluation time.**
+`flake.nix` imports a second nixpkgs with `allowUnfree` and `android_sdk.accept_license` for that alone, so no other output and nothing a consumer builds from this flake inherits that config.
 
 **`mobile` is constrained by what gomobile can bind.**
 Strings, numbers, errors, and structs of those.

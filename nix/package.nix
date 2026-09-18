@@ -28,7 +28,7 @@
     ];
   };
 
-  vendorHash = "sha256-fC3MocVZxKLNNRgWySRl6NzB330zDe4hl+JciULFdLM=";
+  vendorHash = "sha256-jqM4hS62D/df46UBpZaEBSf85mQ/O/f/23Z8X7vuUiI=";
 
   subPackages = [ "cmd/slip" ];
 

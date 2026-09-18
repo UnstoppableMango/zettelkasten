@@ -3,3 +3,8 @@
 .direnv/
 bin/
 *.local.*
+
+# gomobile output
+mobile/*.aar
+mobile/*.jar
+mobile/*.xcframework/
