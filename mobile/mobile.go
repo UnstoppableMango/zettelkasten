@@ -53,20 +53,22 @@ func NewConfig() *Config {
 type Client struct {
 	dir    string
 	syncer *gitsync.Syncer
-
-	// errMu guards lastErr, which the status line reads from the UI thread
-	// while a background sync is writing it.
-	errMu   sync.Mutex
-	lastErr string
 }
 
-// syncMu keeps two syncs off one worktree.
+// syncMu keeps two syncs off one worktree, and errMu guards lastErr.
 //
-// It is package level rather than a field, because a Client is built fresh
+// Both are package level rather than fields, because a Client is built fresh
 // wherever one is needed: Android constructs one per activity and another
 // inside the worker that publishes in the background, and they all point at the
-// same directory. A lock that lives on the instance would guard nothing.
-var syncMu sync.Mutex
+// same directory. A lock that lives on the instance would guard nothing, and a
+// failure recorded on the worker's client would be unreadable from the screen,
+// which is the only place anyone would see it.
+var (
+	syncMu sync.Mutex
+
+	errMu   sync.Mutex
+	lastErr string
+)
 
 func NewClient(cfg *Config) *Client {
 	return &Client{
@@ -95,7 +97,7 @@ func (c *Client) Capture(body string) (string, error) {
 func (c *Client) Pending() int {
 	n, err := c.syncer.Pending()
 	if err != nil {
-		c.setErr(err)
+		setErr(err)
 		return 0
 	}
 
@@ -111,11 +113,11 @@ func (c *Client) Sync() error {
 	defer cancel()
 
 	if _, err := c.syncer.Sync(ctx); err != nil {
-		c.setErr(err)
+		setErr(err)
 		return err
 	}
 
-	c.setErr(nil)
+	setErr(nil)
 
 	return nil
 }
@@ -123,21 +125,24 @@ func (c *Client) Sync() error {
 // LastError is the most recent failure, for the status line. Pending returns a
 // bare count because a number is what the screen wants, so this is where the
 // reason it might be wrong goes.
+//
+// It reports failures from every client in the process, which is what makes a
+// sync that failed in the background readable from the capture screen.
 func (c *Client) LastError() string {
-	c.errMu.Lock()
-	defer c.errMu.Unlock()
+	errMu.Lock()
+	defer errMu.Unlock()
 
-	return c.lastErr
+	return lastErr
 }
 
-func (c *Client) setErr(err error) {
-	c.errMu.Lock()
-	defer c.errMu.Unlock()
+func setErr(err error) {
+	errMu.Lock()
+	defer errMu.Unlock()
 
 	if err == nil {
-		c.lastErr = ""
+		lastErr = ""
 		return
 	}
 
-	c.lastErr = err.Error()
+	lastErr = err.Error()
 }

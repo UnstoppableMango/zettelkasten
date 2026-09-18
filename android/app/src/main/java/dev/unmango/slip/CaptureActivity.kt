@@ -67,8 +67,11 @@ class CaptureActivity : ComponentActivity() {
     private fun sharedText(intent: Intent): String =
         when (intent.action) {
             Intent.ACTION_SEND -> {
-                val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT).orEmpty()
-                val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+                // Both are CharSequence, not String. An app sharing styled
+                // text hands over a SpannedString, and getStringExtra answers
+                // null for it, which is a share that silently captures nothing.
+                val subject = intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT)?.toString().orEmpty()
+                val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
 
                 listOf(subject, text).filter { it.isNotBlank() }.joinToString("\n\n")
             }
@@ -89,6 +92,7 @@ private fun CaptureScreen(initial: String, finishOnSave: Boolean, onFinish: () -
     var body by remember { mutableStateOf(TextFieldValue(initial)) }
     var pending by remember { mutableStateOf(0L) }
     var status by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
 
     suspend fun refresh() {
         withContext(Dispatchers.IO) {
@@ -131,25 +135,37 @@ private fun CaptureScreen(initial: String, finishOnSave: Boolean, onFinish: () -
             Button(
                 onClick = {
                     val text = body.text
+                    saving = true
 
                     scope.launch {
-                        val error = withContext(Dispatchers.IO) {
-                            runCatching { Notebook.client(context).capture(text) }.exceptionOrNull()
+                        try {
+                            val error = withContext(Dispatchers.IO) {
+                                runCatching { Notebook.client(context).capture(text) }
+                                    .exceptionOrNull()
+                            }
+
+                            if (error != null) {
+                                status = error.message.orEmpty()
+                                return@launch
+                            }
+
+                            body = TextFieldValue("")
+                            SyncWorker.enqueue(context)
+                            refresh()
+
+                            if (finishOnSave) onFinish()
+                        } finally {
+                            // Cleared on every path. The field is only emptied
+                            // on success, so a second tap after a failure has
+                            // to be able to retry the same text.
+                            saving = false
                         }
-
-                        if (error != null) {
-                            status = error.message.orEmpty()
-                            return@launch
-                        }
-
-                        body = TextFieldValue("")
-                        SyncWorker.enqueue(context)
-                        refresh()
-
-                        if (finishOnSave) onFinish()
                     }
                 },
-                enabled = body.text.isNotBlank(),
+                // Two quick taps would otherwise launch two coroutines holding
+                // the same text, before the first has emptied the field, and
+                // capture the thought twice.
+                enabled = body.text.isNotBlank() && !saving,
             ) {
                 Text("Save")
             }

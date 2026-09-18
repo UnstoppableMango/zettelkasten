@@ -25,15 +25,24 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             Notebook.client(applicationContext).sync()
             Result.success()
         } catch (e: Exception) {
-            // The reason is on the client's LastError, which the capture screen
-            // reads. Retrying is right for a dropped connection and harmless
-            // for a bad token, which will simply keep failing in view.
-            Result.retry()
+            // The reason is on LastError, which the capture screen reads.
+            //
+            // The binding says nothing about whether a failure is worth trying
+            // again, and most are: a dropped connection, a captive portal, a
+            // remote that moved. A rejected token is not, and retrying that
+            // one forever spends battery on a request that cannot succeed and
+            // that nobody is watching. Giving up after a few attempts leaves
+            // the notes pending and the reason on screen, and the next capture
+            // enqueues a fresh sync anyway.
+            if (runAttemptCount >= MAX_ATTEMPTS) Result.failure() else Result.retry()
         }
     }
 
     companion object {
         const val NAME = "sync"
+
+        /** Roughly half an hour of exponential backoff before giving up. */
+        private const val MAX_ATTEMPTS = 5
 
         /**
          * enqueue replaces any sync already queued. A sync publishes everything
