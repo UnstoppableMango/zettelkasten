@@ -68,12 +68,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.help.SetWidth(msg.Width)
 
-		m.textarea.SetWidth(msg.Width)
+		// The setters clamp against the maxima, so the maxima go first.
 		m.textarea.MaxWidth = msg.Width
+		m.textarea.SetWidth(msg.Width)
 
 		height := max(msg.Height-chrome, 1)
-		m.textarea.SetHeight(height)
 		m.textarea.MaxHeight = height
+		m.textarea.SetHeight(height)
 
 		return m, nil
 
