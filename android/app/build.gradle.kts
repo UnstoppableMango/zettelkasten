@@ -23,6 +23,14 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // emulator-test.sh passes the git daemon it started. Without it the
+        // tests that publish skip rather than fail, so a bare
+        // `gradle connectedDebugAndroidTest` still says something useful.
+        testInstrumentationRunnerArguments["slipRemote"] =
+            (project.findProperty("slip.remote") ?: "").toString()
     }
 
     buildTypes {
@@ -74,4 +82,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.work.runtime.ktx)
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.junit)
 }

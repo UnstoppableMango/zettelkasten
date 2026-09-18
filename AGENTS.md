@@ -29,6 +29,7 @@ The binary is `slip`; the module is `github.com/UnstoppableMango/zettelkasten`.
 | `make test` | `go test ./...` |
 | `make check` | `nix flake check` (treefmt, vet, race, tests) |
 | `make fmt` | `nix fmt` |
+| `make android-test` | Instrumented tests on a headless emulator |
 | `make apk` | `gradle assembleDebug` in `android/` |
 | `make bind` | `gomobile bind`, producing `mobile/slip.aar` for Android |
 | `make install` | `gradle installDebug`, onto an attached device |
@@ -63,7 +64,17 @@ Two devices capturing in the same minute produce different notes at the same add
 Weakening either one silently drops somebody's thought.
 
 **The Android work needs `nix develop .#android`, not the default shell.**
-The SDK and NDK are several gigabytes of unfree closure, and none of it is needed to change a line of Go.
+The SDK, NDK, and a system image are several gigabytes of unfree closure, and none of it is needed to change a line of Go.
+
+**There are two SDK roots, and mixing them up breaks the emulator confusingly.**
+`ANDROID_HOME` is the build SDK, with the platforms and build tools the app compiles against.
+`SLIP_EMULATOR_SDK` is the other one, which holds the emulator and its system image, composed separately because `composeAndroidPackages` fetches an image for every platform in `platformVersions`.
+`avdmanager` and the emulator read `ANDROID_HOME` in preference to `ANDROID_SDK_ROOT`, so an AVD created against the build SDK records a system image path that does not exist, and the emulator dies saying the AVD is broken, which is not what is broken.
+
+**Instrumented tests publish to `git daemon`, not to a directory.**
+go-git speaks the git protocol in process, where a filesystem remote makes it exec `git-upload-pack`, and there is no git binary on an Android device.
+`emulator-test.sh` starts the daemon on the host and passes `git://10.0.2.2:9418/...` in as an instrumentation argument.
+Without that argument `PublishTest` skips rather than fails, so a bare `gradle connectedDebugAndroidTest` still runs everything it can.
 
 **`mobile/slip.aar` is not checked in, and the app depends on it by path.**
 It is 37M of compiled Go reproduced by `make bind` from the source beside it, so `make apk` needs a bind first.

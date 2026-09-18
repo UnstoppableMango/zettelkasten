@@ -22,6 +22,11 @@ apk: mobile/slip.aar
 install: mobile/slip.aar
 	cd android && gradle installDebug
 
+# The instrumented tests, on a headless emulator, against a git daemon the
+# emulator can reach. This is the only thing that runs the app's code.
+android-test: mobile/slip.aar
+	cd android && ./emulator-test.sh
+
 update:
 	nix flake update
 
