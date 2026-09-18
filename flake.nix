@@ -78,6 +78,18 @@
             buildToolsVersions = [ "35.0.0" ];
           };
 
+          # composeAndroidPackages fetches a system image for every platform in
+          # platformVersions, so the emulator is composed on its own. Sharing
+          # androidBuild's list would mean a second image, for an Android
+          # nothing is tested on, at a gigabyte and a half.
+          androidEmulator = androidNixpkgs.androidenv.composeAndroidPackages {
+            includeEmulator = true;
+            includeSystemImages = true;
+            systemImageTypes = [ "google_apis" ];
+            abiVersions = [ "x86_64" ];
+            platformVersions = [ androidCompileApi ];
+          };
+
           gomobile = androidNixpkgs.gomobile.override { androidPkgs = androidBuild; };
         in
         {
@@ -129,8 +141,9 @@
             ];
           };
 
-          # Separate, because the Android SDK and NDK are several gigabytes of
-          # unfree closure and none of it is needed to change a line of Go.
+          # Separate, because the Android SDK, NDK, and a system image are
+          # several gigabytes of unfree closure and none of it is needed to
+          # change a line of Go.
           devShells.android = pkgs.mkShellNoCC {
             inputsFrom = [ self'.devShells.default ];
 
@@ -142,12 +155,22 @@
               gomobile
               pkgs.gradle
               pkgs.jdk17
+
+              # git daemon serves the notebook the instrumented tests publish
+              # to. go-git speaks that protocol in process, where a remote on
+              # the local filesystem would need git-upload-pack on the device.
+              pkgs.git
             ];
 
             # Gradle finds the SDK through ANDROID_HOME. gomobile's wrapper
             # sets the same variable for itself, but only inside its own
             # process, so Gradle needs it here.
             ANDROID_HOME = "${androidBuild.androidsdk}/libexec/android-sdk";
+
+            # The emulator and its system image live in their own SDK root, and
+            # android/emulator-test.sh reads this to find them.
+            SLIP_EMULATOR_SDK = "${androidEmulator.androidsdk}/libexec/android-sdk";
+            SLIP_ANDROID_API = androidCompileApi;
 
             # gomobile's wrapper appends its own store path to GOPATH, so an
             # unset GOPATH leaves the read-only store as the only entry and the

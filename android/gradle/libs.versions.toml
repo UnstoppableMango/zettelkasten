@@ -5,7 +5,10 @@ activityCompose = "1.9.3"
 composeBom = "2024.12.01"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"
+junit = "4.13.2"
 securityCrypto = "1.1.0-alpha06"
+testExtJunit = "1.2.1"
+testRunner = "1.6.2"
 work = "2.10.0"
 
 [libraries]
@@ -16,6 +19,9 @@ androidx-compose-ui = { module = "androidx.compose.ui:ui" }
 androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "testExtJunit" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "testRunner" }
+junit = { module = "junit:junit", version.ref = "junit" }
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 
