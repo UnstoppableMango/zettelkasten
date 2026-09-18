@@ -13,6 +13,15 @@ bind: mobile/slip.aar
 mobile/slip.aar: $(shell find internal mobile -name '*.go')
 	gomobile bind -target=android -androidapi 24 -o $@ ./mobile
 
+# The capture app, around the archive above. There is no gradle wrapper: the
+# dev shell pins gradle, so a wrapper would add a checked-in binary and a second
+# version to keep in step.
+apk: mobile/slip.aar
+	cd android && gradle assembleDebug
+
+install: mobile/slip.aar
+	cd android && gradle installDebug
+
 update:
 	nix flake update
 

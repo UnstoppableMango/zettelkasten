@@ -54,15 +54,19 @@ type Client struct {
 	dir    string
 	syncer *gitsync.Syncer
 
-	// mu keeps a sync triggered by a background worker from overlapping the
-	// one the person just tapped. Both hit the same worktree.
-	mu sync.Mutex
-
-	// errMu is separate because Sync records its failure while still holding
-	// mu, and the status line reads this from the UI thread meanwhile.
+	// errMu guards lastErr, which the status line reads from the UI thread
+	// while a background sync is writing it.
 	errMu   sync.Mutex
 	lastErr string
 }
+
+// syncMu keeps two syncs off one worktree.
+//
+// It is package level rather than a field, because a Client is built fresh
+// wherever one is needed: Android constructs one per activity and another
+// inside the worker that publishes in the background, and they all point at the
+// same directory. A lock that lives on the instance would guard nothing.
+var syncMu sync.Mutex
 
 func NewClient(cfg *Config) *Client {
 	return &Client{
@@ -100,8 +104,8 @@ func (c *Client) Pending() int {
 
 // Sync publishes everything pending.
 func (c *Client) Sync() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	syncMu.Lock()
+	defer syncMu.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
 	defer cancel()

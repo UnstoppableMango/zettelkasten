@@ -7,6 +7,7 @@ The binary is `slip`; the module is `github.com/UnstoppableMango/zettelkasten`.
 
 | Path | Owns |
 | ------------------- | ---------------------------------------------------------------- |
+| `android` | The Android capture app, in Kotlin and Compose |
 | `cmd/slip` | Passthrough dispatch, then cobra |
 | `internal/cli` | Cobra commands. Thin; behavior lives in the packages below |
 | `internal/note` | The domain type and both serializations (frontmatter and proto) |
@@ -28,7 +29,9 @@ The binary is `slip`; the module is `github.com/UnstoppableMango/zettelkasten`.
 | `make test` | `go test ./...` |
 | `make check` | `nix flake check` (treefmt, vet, race, tests) |
 | `make fmt` | `nix fmt` |
+| `make apk` | `gradle assembleDebug` in `android/` |
 | `make bind` | `gomobile bind`, producing `mobile/slip.aar` for Android |
+| `make install` | `gradle installDebug`, onto an attached device |
 | `make generate` | Regenerate `gen/` from the pinned apis input |
 | `make gomod` | Refresh `vendorHash` after a dependency change |
 
@@ -61,6 +64,27 @@ Weakening either one silently drops somebody's thought.
 
 **The Android work needs `nix develop .#android`, not the default shell.**
 The SDK and NDK are several gigabytes of unfree closure, and none of it is needed to change a line of Go.
+
+**`mobile/slip.aar` is not checked in, and the app depends on it by path.**
+It is 37M of compiled Go reproduced by `make bind` from the source beside it, so `make apk` needs a bind first.
+Both Makefile targets declare that, but an IDE building `android/` on its own will not.
+
+**Three numbers in `android/app/build.gradle.kts` are pinned to the flake.**
+`minSdk` must equal the `-androidapi` gomobile bound against, because the archive is compiled for that NDK sysroot and a lower `minSdk` links against symbols the device will not have.
+`compileSdk` and `buildToolsVersion` must be platforms the flake composes, because AGP responds to a missing one by trying to install it, and the SDK is read-only in the nix store.
+
+**The APK is split per ABI, so there is no `app-debug.apk`.**
+The bulk of this app is `libgojni.so`, and a universal build carries four copies of the Go runtime where three can never run.
+The outputs are `app-arm64-v8a-debug.apk` and its siblings, about 28M each against 82M universal.
+`gradle installDebug` picks the right one for whatever is attached; anything scripting `adb install` has to name the ABI.
+
+**There is no gradle wrapper, deliberately.**
+The dev shell pins gradle, so a wrapper would add a checked-in binary and a second version to keep in step.
+Build with `make apk` or `nix develop -c gradle`, never a bare `./gradlew`.
+
+**Every sync goes through `SyncWorker`, including the one the person taps.**
+`mobile.Client` is built fresh wherever one is needed, so its sync lock is package level in Go rather than a field.
+Routing the UI through WorkManager's unique work is the other half: two syncs on one worktree is not a state the rewind-and-replay model survives.
 
 **`mobile/bind.go` is why `go mod tidy` keeps `golang.org/x/mobile`.**
 gomobile resolves its bind runtime through the module graph, so the module has to require it even though nothing here imports it.
