@@ -12,11 +12,13 @@ The binary is `slip`; the module is `github.com/UnstoppableMango/zettelkasten`.
 | `internal/note` | The domain type and both serializations (frontmatter and proto) |
 | `internal/store` | Writing notes to a directory. Knows nothing about their format |
 | `internal/config` | Where notes go |
+| `internal/gitsync` | Publishing captured notes to a git remote |
 | `internal/notebook` | zk notebook discovery and `.zk/config.toml` |
 | `internal/passthru` | Handing unowned commands to zk |
 | `internal/tui` | The capture screen. Touches no files |
 | `internal/zk` | Typed reader for `zk list --format jsonl` |
 | `gen` | Generated protobuf. Never edited by hand |
+| `mobile` | The gomobile binding surface. Thin; behavior lives in the packages above |
 
 ## Commands
 
@@ -46,6 +48,24 @@ The binary is `slip`; the module is `github.com/UnstoppableMango/zettelkasten`.
 **Adding or removing a Go dependency requires `make gomod`.** Otherwise `nix build` fails. Note the failure is sometimes an "inconsistent vendoring" error rather than a hash mismatch, because nix reuses the cached vendor directory keyed by the stale hash.
 
 **Global protobuf registry hazard.** Adding `google.golang.org/genproto/googleapis/api/annotations` or `k8s.io/api` as a dependency panics at init with "file already registered", because `gen/` registers those descriptors itself. Registry keys are proto file paths, so our own `go_package_prefix` does not avoid it. Init-time panic, no compile-time warning.
+
+**A sync never merges and never rebases.**
+go-git implements neither, and a zettelkasten does not need them: nothing is ever edited or deleted, so every publish is a fast-forward.
+`gitsync` rewinds the worktree to the remote and replays the pending notes on top, holding them in memory for the duration, which is what makes a rejected push cost nothing and a sync interrupted between its commit and its push recoverable.
+
+**A name match is not proof a note is published.**
+Two devices capturing in the same minute produce different notes at the same address.
+`gitsync.publishedAlready` compares blob hashes for that reason, and `commit` re-resolves the id through `note.NextID` against the remote, rewriting the frontmatter alongside the filename.
+Weakening either one silently drops somebody's thought.
+
+**`mobile` is constrained by what gomobile can bind.**
+Strings, numbers, errors, and structs of those.
+No slices of structs, no maps, no channels, no exported field holding an interface.
+`mobile.TestBindableSurface` pins the signatures, because the alternative is finding out during an Android build.
+
+**`nix/package.nix` needs `git` in `nativeCheckInputs`, and every new top-level directory in its fileset.**
+The gitsync tests publish to a remote that is a directory on disk, and go-git serves that transport by executing `git-upload-pack` rather than in process.
+The fileset is an allowlist: a package missing from it fails `nix flake check` at vet with "cannot find module providing package", which reads like a vendoring problem and is not one.
 
 **zk-org/zk is GPL-3.0-only and this repo is MIT.** Never copy, vendor, or import its code; all of it is under `internal/` and unimportable anyway. Interop is subprocess-only: run the binary, parse its output. Relicensing would be the prerequisite for changing that, and it is not a thing to do incidentally.
 

@@ -1,6 +1,7 @@
 {
   lib,
   buildGoModule,
+  git,
   go_1_27,
   makeWrapper,
   zk,
@@ -23,14 +24,20 @@
       ../cmd
       ../gen
       ../internal
+      ../mobile
     ];
   };
 
-  vendorHash = "sha256-4Hv75jMJl3NOlo5jVS2qU9ZUL5HQXTpKrloEoqEg47k=";
+  vendorHash = "sha256-fC3MocVZxKLNNRgWySRl6NzB330zDe4hl+JciULFdLM=";
 
   subPackages = [ "cmd/slip" ];
 
   nativeBuildInputs = lib.optional withZk makeWrapper;
+
+  # gitsync's tests publish to a remote that is a directory on disk, and go-git
+  # serves that transport by executing git-upload-pack rather than in process.
+  # Nothing but the tests needs it, and it stays out of the runtime closure.
+  nativeCheckInputs = [ git ];
 
   postInstall = lib.optionalString withZk ''
     wrapProgram $out/bin/slip --suffix PATH : ${lib.makeBinPath [ zk ]}
