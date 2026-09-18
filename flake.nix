@@ -20,6 +20,19 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.systems.follows = "systems";
       inputs.flake-parts.follows = "flake-parts";
+      inputs.mangopkgs.follows = "mangopkgs";
+      inputs.treefmt-nix.follows = "treefmt-nix";
+    };
+
+    # apis hoists this from a2b for the same reason it is hoisted again here:
+    # nothing in this flake evaluates mangopkgs, but a consumer that cannot
+    # reach it with one `follows` locks a second copy of it, and with it a
+    # second gomod2nix, flake-utils, and nix2container.
+    mangopkgs = {
+      url = "github:unmango/pkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.systems.follows = "systems";
+      inputs.flake-parts.follows = "flake-parts";
       inputs.treefmt-nix.follows = "treefmt-nix";
     };
 
