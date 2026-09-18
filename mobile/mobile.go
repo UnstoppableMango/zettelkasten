@@ -53,16 +53,22 @@ func NewConfig() *Config {
 type Client struct {
 	dir    string
 	syncer *gitsync.Syncer
+}
 
-	// mu keeps a sync triggered by a background worker from overlapping the
-	// one the person just tapped. Both hit the same worktree.
-	mu sync.Mutex
+// syncMu keeps two syncs off one worktree, and errMu guards lastErr.
+//
+// Both are package level rather than fields, because a Client is built fresh
+// wherever one is needed: Android constructs one per activity and another
+// inside the worker that publishes in the background, and they all point at the
+// same directory. A lock that lives on the instance would guard nothing, and a
+// failure recorded on the worker's client would be unreadable from the screen,
+// which is the only place anyone would see it.
+var (
+	syncMu sync.Mutex
 
-	// errMu is separate because Sync records its failure while still holding
-	// mu, and the status line reads this from the UI thread meanwhile.
 	errMu   sync.Mutex
 	lastErr string
-}
+)
 
 func NewClient(cfg *Config) *Client {
 	return &Client{
@@ -91,7 +97,7 @@ func (c *Client) Capture(body string) (string, error) {
 func (c *Client) Pending() int {
 	n, err := c.syncer.Pending()
 	if err != nil {
-		c.setErr(err)
+		setErr(err)
 		return 0
 	}
 
@@ -100,18 +106,18 @@ func (c *Client) Pending() int {
 
 // Sync publishes everything pending.
 func (c *Client) Sync() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	syncMu.Lock()
+	defer syncMu.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
 	defer cancel()
 
 	if _, err := c.syncer.Sync(ctx); err != nil {
-		c.setErr(err)
+		setErr(err)
 		return err
 	}
 
-	c.setErr(nil)
+	setErr(nil)
 
 	return nil
 }
@@ -119,21 +125,24 @@ func (c *Client) Sync() error {
 // LastError is the most recent failure, for the status line. Pending returns a
 // bare count because a number is what the screen wants, so this is where the
 // reason it might be wrong goes.
+//
+// It reports failures from every client in the process, which is what makes a
+// sync that failed in the background readable from the capture screen.
 func (c *Client) LastError() string {
-	c.errMu.Lock()
-	defer c.errMu.Unlock()
+	errMu.Lock()
+	defer errMu.Unlock()
 
-	return c.lastErr
+	return lastErr
 }
 
-func (c *Client) setErr(err error) {
-	c.errMu.Lock()
-	defer c.errMu.Unlock()
+func setErr(err error) {
+	errMu.Lock()
+	defer errMu.Unlock()
 
 	if err == nil {
-		c.lastErr = ""
+		lastErr = ""
 		return
 	}
 
-	c.lastErr = err.Error()
+	lastErr = err.Error()
 }

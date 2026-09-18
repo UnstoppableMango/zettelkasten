@@ -8,3 +8,9 @@ bin/
 mobile/*.aar
 mobile/*.jar
 mobile/*.xcframework/
+
+# android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties

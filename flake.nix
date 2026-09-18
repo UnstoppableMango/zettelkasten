@@ -63,11 +63,19 @@
           # Android the app supports is pinned here rather than left to
           # whichever platform the SDK happens to ship. The NDK accepts 21
           # through 35; 24 is the floor that still reaches ordinary phones.
+          #
+          # Both levels are the app's too: android/app/build.gradle.kts sets
+          # minSdk to the first and compileSdk to the second.
           androidApi = "24";
+          androidCompileApi = "35";
 
           androidBuild = androidNixpkgs.androidenv.composeAndroidPackages {
             includeNDK = true;
-            platformVersions = [ androidApi ];
+            platformVersions = [
+              androidApi
+              androidCompileApi
+            ];
+            buildToolsVersions = [ "35.0.0" ];
           };
 
           gomobile = androidNixpkgs.gomobile.override { androidPkgs = androidBuild; };
@@ -129,10 +137,17 @@
             packages = [
               # gomobile builds mobile/ into an .aar. Its wrapper puts the SDK
               # on PATH and sets ANDROID_HOME; the JDK is what assembles the
-              # archive once the NDK has compiled the Go side.
+              # archive once the NDK has compiled the Go side, and what Gradle
+              # runs on to build the app around it.
               gomobile
-              pkgs.jdk
+              pkgs.gradle
+              pkgs.jdk17
             ];
+
+            # Gradle finds the SDK through ANDROID_HOME. gomobile's wrapper
+            # sets the same variable for itself, but only inside its own
+            # process, so Gradle needs it here.
+            ANDROID_HOME = "${androidBuild.androidsdk}/libexec/android-sdk";
 
             # gomobile's wrapper appends its own store path to GOPATH, so an
             # unset GOPATH leaves the read-only store as the only entry and the

@@ -131,6 +131,33 @@ func TestSyncRecordsItsFailure(t *testing.T) {
 	}
 }
 
+// The capture screen builds its own client and asks it what went wrong. The
+// sync that failed happened on a different client, inside a background worker
+// that has since discarded it, so an error recorded per instance would never
+// reach the only place anyone would read it.
+func TestLastErrorIsVisibleFromAnotherClient(t *testing.T) {
+	dir := t.TempDir()
+
+	broken := mobile.NewConfig()
+	broken.Dir = dir
+	broken.RemoteURL = filepath.Join(t.TempDir(), "nowhere")
+	broken.Branch = "main"
+
+	worker := mobile.NewClient(broken)
+	if _, err := worker.Capture("a thought\n"); err != nil {
+		t.Fatalf("Capture() error = %v", err)
+	}
+
+	if err := worker.Sync(); err == nil {
+		t.Fatal("Sync() to a missing remote returned no error")
+	}
+
+	screen := mobile.NewClient(broken)
+	if got := screen.LastError(); got == "" {
+		t.Error("LastError() on a second client is empty after a failed Sync()")
+	}
+}
+
 // A failed sync must be recoverable by fixing the remote, not by recapturing.
 func TestSyncClearsTheLastErrorOnceItSucceeds(t *testing.T) {
 	remote := newRemote(t)
