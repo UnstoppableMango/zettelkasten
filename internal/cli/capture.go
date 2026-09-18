@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	notev1 "github.com/UnstoppableMango/zettelkasten/gen/unmango/zettelkasten/note/v1alpha1"
 	"github.com/UnstoppableMango/zettelkasten/internal/config"
 	"github.com/UnstoppableMango/zettelkasten/internal/note"
 	"github.com/UnstoppableMango/zettelkasten/internal/store"
 	"github.com/UnstoppableMango/zettelkasten/internal/tui"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -131,7 +131,6 @@ func runTUI(cfg config.Config, noteType notev1.NoteType) (string, bool, error) {
 
 	model, err := tea.NewProgram(
 		tui.New(id, shortNoteType(noteType), path),
-		tea.WithAltScreen(),
 	).Run()
 	if err != nil {
 		return "", false, fmt.Errorf("running the capture screen: %w", err)

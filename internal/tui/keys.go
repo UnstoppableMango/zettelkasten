@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 // keyMap is the capture screen's bindings. Enter is deliberately absent: this
 // is a multi-line editor, and saving on enter would fight the thing it is for.

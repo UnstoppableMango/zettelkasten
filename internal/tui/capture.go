@@ -6,11 +6,11 @@ package tui
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // chrome is the header and footer lines plus the blank line under the header.
@@ -52,26 +52,33 @@ func New(zettelID, noteType, path string) Model {
 	}
 }
 
+// The background color decides the textarea's palette: lipgloss no longer
+// detects it, so we ask for it and restyle when the answer arrives.
 func (m Model) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(textarea.Blink, tea.RequestBackgroundColor)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.BackgroundColorMsg:
+		m.textarea.SetStyles(textarea.DefaultStyles(msg.IsDark()))
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.help.Width = msg.Width
+		m.help.SetWidth(msg.Width)
 
-		m.textarea.SetWidth(msg.Width)
+		// The setters clamp against the maxima, so the maxima go first.
 		m.textarea.MaxWidth = msg.Width
+		m.textarea.SetWidth(msg.Width)
 
 		height := max(msg.Height-chrome, 1)
-		m.textarea.SetHeight(height)
 		m.textarea.MaxHeight = height
+		m.textarea.SetHeight(height)
 
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, keys.Save):
 			m.saved = true
@@ -89,13 +96,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() string {
-	return strings.Join([]string{
+func (m Model) View() tea.View {
+	v := tea.NewView(strings.Join([]string{
 		headerStyle.Render(m.header),
 		"",
 		m.textarea.View(),
 		m.help.View(keys),
-	}, "\n")
+	}, "\n"))
+
+	v.AltScreen = true
+
+	return v
 }
 
 // Result reports what the user decided.
