@@ -17,15 +17,15 @@ mobile/slip.aar: $(shell find internal mobile -name '*.go')
 # dev shell pins gradle, so a wrapper would add a checked-in binary and a second
 # version to keep in step.
 apk: mobile/slip.aar
-	cd android && gradle assembleDebug
+	nix develop .#android -c gradle assembleDebug
 
 install: mobile/slip.aar
-	cd android && gradle installDebug
+	nix develop .#android -c gradle installDebug
 
 # The instrumented tests, on a headless emulator, against a git daemon the
 # emulator can reach. This is the only thing that runs the app's code.
 android-test: mobile/slip.aar
-	cd android && ./emulator-test.sh
+	nix develop .#android -c ./emulator-test.sh
 
 update:
 	nix flake update
