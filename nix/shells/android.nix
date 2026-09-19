@@ -77,5 +77,6 @@ mkShellNoCC {
   # front of it.
   shellHook = ''
     export GOPATH="''${GOPATH:-$HOME/go}"
+    cd "$(git rev-parse --show-toplevel)/android"
   '';
 }
