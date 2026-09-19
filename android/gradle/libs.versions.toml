@@ -8,7 +8,7 @@ lifecycle = "2.8.7"
 junit = "4.13.2"
 securityCrypto = "1.1.0-alpha06"
 testExtJunit = "1.2.1"
-testRunner = "1.6.2"
+testRunner = "1.7.0"
 work = "2.10.0"
 
 [libraries]
