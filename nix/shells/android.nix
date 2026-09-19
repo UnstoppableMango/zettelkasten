@@ -1,13 +1,14 @@
 # The Android dev shell, separate from the default one because the SDK, NDK,
 # and a system image are several gigabytes of unfree closure and none of it is
-# needed to change a line of Go.
+# needed to edit Go code.
 {
+  androidenv,
   git,
+  gomobile,
   gradle,
   inputsFrom ? [ ],
   jdk17,
   mkShellNoCC,
-  pkgs,
 }:
 let
   # gomobile compiles against the SDK platform matching its -androidapi and
@@ -21,7 +22,7 @@ let
   androidApi = "24";
   androidCompileApi = "35";
 
-  androidBuild = pkgs.androidenv.composeAndroidPackages {
+  androidBuild = androidenv.composeAndroidPackages {
     includeNDK = true;
     platformVersions = [
       androidApi
@@ -34,15 +35,13 @@ let
   # platformVersions, so the emulator is composed on its own. Sharing
   # androidBuild's list would mean a second image, for an Android nothing is
   # tested on, at a gigabyte and a half.
-  androidEmulator = pkgs.androidenv.composeAndroidPackages {
+  androidEmulator = androidenv.composeAndroidPackages {
     includeEmulator = true;
     includeSystemImages = true;
     systemImageTypes = [ "google_apis" ];
     abiVersions = [ "x86_64" ];
     platformVersions = [ androidCompileApi ];
   };
-
-  gomobile = pkgs.gomobile.override { androidPkgs = androidBuild; };
 in
 mkShellNoCC {
   inherit inputsFrom;
@@ -52,7 +51,7 @@ mkShellNoCC {
     # and sets ANDROID_HOME; the JDK is what assembles the archive once the NDK
     # has compiled the Go side, and what Gradle runs on to build the app around
     # it.
-    gomobile
+    (gomobile.override { androidPkgs = androidBuild; })
     gradle
     jdk17
 

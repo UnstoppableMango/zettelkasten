@@ -107,16 +107,23 @@
             ];
           };
 
-          devShells.android = pkgs.callPackage ./nix/android.nix {
-            inputsFrom = [ self'.devShells.default ];
-            pkgs = import pkgs {
-              inherit system;
-              config = {
-                allowUnfree = true;
-                android_sdk.accept_license = true;
+          # The Android SDK and NDK are unfree, and the SDK carries a licence
+          # that has to be accepted before it will evaluate at all. Confining
+          # both to a nixpkgs of their own keeps every other output, and
+          # anything a consumer builds from this flake, on the default config.
+          devShells.android =
+            let
+              pkgs = import inputs.nixpkgs {
+                inherit system;
+                config = {
+                  allowUnfree = true;
+                  android_sdk.accept_license = true;
+                };
               };
+            in
+            pkgs.callPackage ./nix/shells/android.nix {
+              inputsFrom = [ self'.devShells.default ];
             };
-          };
 
           treefmt.programs = {
             actionlint.enable = true;
